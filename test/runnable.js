@@ -89,6 +89,14 @@ describe('Runnable(title, fn)', function(){
     })
   })
 
+  describe('#retries(n)', function(){
+    it('should set the number of retries', function(){
+      var run = new Runnable;
+      run.retries(1);
+      run.retries().should.equal(1);
+    })
+  })
+
   describe('.run(fn)', function(){
     describe('when .pending', function(){
       it('should not invoke the callback', function(done){
@@ -98,6 +106,21 @@ describe('Runnable(title, fn)', function(){
 
         test.pending = true;
         test.run(done);
+      })
+    })
+
+    describe('when ._retries', function(){
+      it('should retry until out of retries', function(done){
+        var test = new Runnable('foo', function(){
+          throw new Error('should invoke the callback');
+        });
+
+        test.retries(2);
+        test.run(function(err){
+          test.retries().should.equal(0);
+          err.message.should.equal('should invoke the callback');
+          done();
+        })
       })
     })
 
