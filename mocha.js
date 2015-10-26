@@ -420,6 +420,21 @@ Context.prototype.skip = function() {
 };
 
 /**
+ * Allow a number of retires on failed tests
+ *
+ * @api private
+ * @param {number} n
+ * @return {Context} self
+ */
+Context.prototype.retries = function(n) {
+  if (!arguments.length) {
+    return this.runnable().retries();
+  }
+  this.runnable().retries(n);
+  return this;
+};
+
+  /**
  * Inspect the context void of `._runnable`.
  *
  * @api private
@@ -588,6 +603,13 @@ module.exports = function(suite) {
     context.xit = context.xspecify = context.it.skip = function(title) {
       context.it(title);
     };
+
+    /**
+     * Number of attempts to retry.
+     */
+    context.it.retries = function(n) {
+      context.retries(n);
+    };
   });
 };
 
@@ -664,6 +686,15 @@ module.exports = function(suites, context) {
        */
       skip: function(title) {
         context.test(title);
+      },
+
+      /**
+       * Number of retry attempts
+       *
+       * @param {string} n
+       */
+      retries: function(n) {
+        context.retries(n);
       }
     }
   };
@@ -830,6 +861,7 @@ module.exports = function(suite) {
     };
 
     context.test.skip = common.test.skip;
+    context.test.retries = common.test.retries;
   });
 };
 
@@ -937,6 +969,7 @@ module.exports = function(suite) {
     };
 
     context.test.skip = common.test.skip;
+    context.test.retries = common.test.retries;
   });
 };
 
@@ -3968,6 +4001,7 @@ function Runnable(title, fn) {
   this._enableTimeouts = true;
   this.timedOut = false;
   this._trace = new Error('done() called multiple times');
+  this._retries = -1;
 }
 
 /**
@@ -4042,6 +4076,20 @@ Runnable.prototype.enableTimeouts = function(enabled) {
  */
 Runnable.prototype.skip = function() {
   throw new Pending();
+};
+
+/**
+ * Set number of retires.
+ *
+ * @api private
+ */
+Runnable.prototype.retries = function(n) {
+  if (!arguments.length) {
+    return this._retries;
+  }
+  if (this._retries === -1){
+    this._retries = n;
+  }
 };
 
 /**
@@ -4146,6 +4194,10 @@ Runnable.prototype.run = function(fn) {
 
   // finished
   function done(err) {
+    if (err && self._retries > 0) {
+      self._retries--;
+      return self.run(fn);
+    }
     var ms = self.timeout();
     if (self.timedOut) {
       return;
